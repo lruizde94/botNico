@@ -5,6 +5,7 @@ import ccxt.async_support as ccxt
 import aiohttp
 from aiohttp import TCPConnector, DefaultResolver
 import socket
+import aiodns
 import requests
 from transformers import pipeline
 from py_clob_client.client import ClobClient
@@ -27,8 +28,28 @@ class FranceBotPoC:
         self.sentiment_pipe = pipeline("text-classification", model="mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis")
         
         # 2. Conexión Binance (Precio Spot)
-        # Forzamos resolver del sistema y uso de IPv4 (algunos stacks Windows funcionan mejor así)
-        connector = TCPConnector(resolver=DefaultResolver(), family=socket.AF_INET)
+        # Intentamos usar aiodns como resolver para aiohttp/ccxt (mejor compatibilidad en Windows)
+        class AioDNSResolver:
+            def __init__(self, nameservers=None):
+                self._resolver = aiodns.DNSResolver(nameservers=nameservers)
+
+            async def resolve(self, host, port=0):
+                try:
+                    answers = await self._resolver.query(host, 'A')
+                    results = []
+                    for a in answers:
+                        results.append({
+                            'hostname': host,
+                            'host': a.host,
+                            'port': port,
+                            'family': socket.AF_INET,
+                        })
+                    return results
+                except Exception as e:
+                    raise OSError(e)
+
+        resolver = AioDNSResolver(nameservers=['8.8.8.8', '1.1.1.1'])
+        connector = TCPConnector(resolver=resolver, family=socket.AF_INET)
         self.exchange = ccxt.binance({'aiohttp': {'connector': connector}})
         
         # 3. Cliente Polymarket (Solo lectura para PoC)
