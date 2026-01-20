@@ -4,6 +4,7 @@ import random
 import ccxt.async_support as ccxt
 import aiohttp
 from aiohttp import TCPConnector, DefaultResolver
+import socket
 import requests
 from transformers import pipeline
 from py_clob_client.client import ClobClient
@@ -26,7 +27,9 @@ class FranceBotPoC:
         self.sentiment_pipe = pipeline("text-classification", model="mrm8488/distilroberta-finetuned-financial-news-sentiment-analysis")
         
         # 2. Conexión Binance (Precio Spot)
-        self.exchange = ccxt.binance()
+        # Forzamos resolver del sistema y uso de IPv4 (algunos stacks Windows funcionan mejor así)
+        connector = TCPConnector(resolver=DefaultResolver(), family=socket.AF_INET)
+        self.exchange = ccxt.binance({'aiohttp': {'connector': connector}})
         
         # 3. Cliente Polymarket (Solo lectura para PoC)
         # No ponemos claves privadas porque no vamos a gastar gas real
