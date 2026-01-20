@@ -4,6 +4,7 @@ import random
 import ccxt.async_support as ccxt
 import aiohttp
 from aiohttp import TCPConnector, DefaultResolver
+import requests
 from transformers import pipeline
 from py_clob_client.client import ClobClient
 from datetime import datetime
@@ -48,16 +49,15 @@ class FranceBotPoC:
                 if attempt < attempts:
                     await asyncio.sleep(1)
 
-        # Segundo intento: petición HTTP directa a la API de Binance usando DefaultResolver
+        # Segundo intento: petición HTTP directa a la API de Binance usando requests (síncrono)
         try:
-            url = 'https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT'
-            connector = TCPConnector(resolver=DefaultResolver())
-            async with aiohttp.ClientSession(connector=connector) as session:
-                async with session.get(url, timeout=10) as resp:
-                    data = await resp.json()
-                    price = float(data.get('price'))
-                    print("[Fallback] Obtenido precio vía HTTP directa a Binance")
-                    return price, False
+            def fetch_price():
+                response = requests.get('https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT', timeout=10)
+                data = response.json()
+                return float(data['price'])
+            price = await asyncio.to_thread(fetch_price)
+            print("[Fallback] Obtenido precio vía HTTP directa a Binance (requests)")
+            return price, False
         except Exception as e:
             print(f"[Warning] HTTP fallback falló: {e}")
 
